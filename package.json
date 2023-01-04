@@ -1,0 +1,21 @@
+{
+  "name": "@modularia/monorepo",
+  "packageManager": "yarn@3.3.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "yarn workspaces foreach --topological-dev --verbose run build",
+    "build:test": "yarn workspaces foreach --topological-dev --verbose run build:test",
+    "build:watch": "yarn workspaces foreach --parallel --verbose --interlaced -j unlimited run build:watch",
+    "clean": "yarn workspaces foreach --parallel --verbose run clean",
+    "test": "yarn workspaces foreach --topological-dev --verbose run test",
+    "w:e2e": "yarn workspace @modularia/e2e",
+    "w:protocol": "yarn workspace @modularia/protocol",
+    "w:sdk": "yarn workspace @modularia/sdk"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.3"
+  }
+}
