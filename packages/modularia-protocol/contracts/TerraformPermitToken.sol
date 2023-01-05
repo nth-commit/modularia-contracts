@@ -11,14 +11,16 @@ contract TerraformPermitToken is ITerraformPermitToken, ERC721, Ownable {
     uint256 private _totalSupply;
     address private _issuer;
     address private _consumer;
-    mapping(uint32 => bool) private _usedKeys;
+    mapping(uint32 => bool) private _oncePerContractUsedKeys;
 
     IERC721 private immutable airdropTo;
     uint256 private immutable airdropMaxSupply;
     mapping(uint256 => bool) private airdropCompletedByTokenId;
     uint256 private airDropCount;
 
-    constructor(IERC721 _airdropTo, uint256 _airdropMaxSupply) ERC721("Terraform Permit Token", "MODT") {
+    mapping(uint256 => uint256) public lockedUntilByTokenId;
+
+    constructor(IERC721 _airdropTo, uint256 _airdropMaxSupply) ERC721("Modularia Terraform Permit Token", "MODT") {
         airdropTo = _airdropTo;
         airdropMaxSupply = _airdropMaxSupply;
     }
@@ -34,9 +36,13 @@ contract TerraformPermitToken is ITerraformPermitToken, ERC721, Ownable {
     }
 
     modifier oncePerContract(uint32 key, string memory errorMessage) {
-        require(_usedKeys[key] == false, errorMessage);
-        _usedKeys[key] = true;
+        require(_oncePerContractUsedKeys[key] == false, errorMessage);
+        _oncePerContractUsedKeys[key] = true;
         _;
+    }
+
+    function totalSupply() external view override returns (uint256) {
+        return _totalSupply;
     }
 
     /**
@@ -55,10 +61,6 @@ contract TerraformPermitToken is ITerraformPermitToken, ERC721, Ownable {
     function setConsumer(address consumer) external onlyOwner oncePerContract(1, "Consumer already set") {
         require(consumer != address(0), "Cannot set consumer to zero address");
         _consumer = consumer;
-    }
-
-    function totalSupply() external view override returns (uint256) {
-        return _totalSupply;
     }
 
     /**
@@ -92,6 +94,22 @@ contract TerraformPermitToken is ITerraformPermitToken, ERC721, Ownable {
         _mint(owner);
     }
 
+    /**
+     * Locks a land permit for a specified duration. Can only be called by the owner.
+     */
+    function lock(uint256 tokenId, uint256 durationSeconds) external onlyOwner {
+        require(_exists(tokenId), "Token does not exist");
+        lockedUntilByTokenId[tokenId] = block.timestamp + durationSeconds;
+    }
+
+    /**
+     * Unlocks a land permit. Can only be called by the owner.
+     */
+    function unlock(uint256 tokenId) external onlyOwner {
+        require(_exists(tokenId), "Token does not exist");
+        delete lockedUntilByTokenId[tokenId];
+    }
+
     function _lookupAirdropOwner(uint256 airdropToTokenId) internal view returns (address) {
         try airdropTo.ownerOf(airdropToTokenId) returns (address owner) {
             return owner;
@@ -103,5 +121,10 @@ contract TerraformPermitToken is ITerraformPermitToken, ERC721, Ownable {
     function _mint(address to) internal {
         _totalSupply++;
         _mint(to, _totalSupply);
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 firstTokenId, uint256 batchSize) internal override {
+        require(lockedUntilByTokenId[firstTokenId] < block.timestamp || from == owner(), "Token is locked");
+        super._beforeTokenTransfer(from, to, firstTokenId, batchSize);
     }
 }

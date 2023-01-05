@@ -21,10 +21,10 @@ describe('TerraformPermitToken', () => {
 
     it('Should require token ID to not already have airdrop', async () => {
       // Arrange
-      const owner = await EthersHelpers.createWalletAddress()
+      const tokenOwner = await EthersHelpers.createWalletAddress()
       const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
       const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 2n)
-      await airdropTo.mint(owner, 1)
+      await airdropTo.mint(tokenOwner, 1)
       await terraformPermitToken.airdrop(1)
 
       // Act
