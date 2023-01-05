@@ -1,45 +1,51 @@
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 import { expect } from 'chai'
+import fc from 'fast-check'
 import { ethers } from 'hardhat'
-import { deployTerraformPermitToken } from '../../helpers/DeployHelpers'
-import { EthersHelpers } from '../Helpers/EthersHelpers'
+import { Arbitrary } from '../TestMachinery/Arbitrary'
+import { SystemFixture } from './SystemFixture'
 
 describe('TerraformPermitToken', () => {
+  const systemFixture = SystemFixture.create()
+
   describe('setConsumer', () => {
     it('Should require caller to be owner', async () => {
-      // Arrange
-      const nonOwner = await EthersHelpers.deployRandomSigner()
-      const consumer = await EthersHelpers.deployRandomSigner()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.walletAddress(), async (consumerAddress) => {
+          // Arrange
+          const { agents } = await loadFixture(systemFixture)
 
-      // Act
-      const txPromise = terraformPermitToken.connect(nonOwner).setConsumer(consumer.address)
+          // Act
+          const txPromise = agents.user.terraformPermitToken.setConsumer(consumerAddress)
 
-      // Assert
-      await expect(txPromise).to.be.revertedWith('Ownable: caller is not the owner')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('Ownable: caller is not the owner')
+        })
+      )
     })
 
     it('Should only be able to set consumer once', async () => {
-      // Arrange
-      const consumer = await EthersHelpers.deployRandomSigner()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.walletAddress(), async (consumerAddress) => {
+          // Arrange
+          const { agents } = await loadFixture(systemFixture)
 
-      // Act
-      await terraformPermitToken.setConsumer(consumer.address)
-      const txPromise = terraformPermitToken.setConsumer(consumer.address)
+          // Act
+          await agents.owner.terraformPermitToken.setConsumer(consumerAddress)
+          const txPromise = agents.owner.terraformPermitToken.setConsumer(consumerAddress)
 
-      // Assert
-      await expect(txPromise).to.be.revertedWith('Consumer already set')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('Consumer already set')
+        })
+      )
     })
 
     it('Should not be able to set consumer to the zero address', async () => {
       // Arrange
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      const { agents } = await loadFixture(systemFixture)
 
       // Act
-      const txPromise = terraformPermitToken.setConsumer(ethers.constants.AddressZero)
+      const txPromise = agents.owner.terraformPermitToken.setConsumer(ethers.constants.AddressZero)
 
       // Assert
       await expect(txPromise).to.be.revertedWith('Cannot set consumer to zero address')
@@ -48,69 +54,70 @@ describe('TerraformPermitToken', () => {
 
   describe('consume', () => {
     it('Should revert if called by non-consumer', async () => {
-      // Arrange
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
-      const toAddress = await EthersHelpers.createWalletAddress()
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.tokenId(), async (tokenId) => {
+          // Arrange
+          const { agents } = await loadFixture(systemFixture)
 
-      // Act
-      const txPromise = terraformPermitToken.consume(toAddress)
+          // Act
+          const txPromise = agents.user.terraformPermitToken.consume(tokenId)
 
-      // Assert
-      await expect(txPromise).to.be.revertedWith('Caller does not have consumer rights')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('Caller does not have consumer rights')
+        })
+      )
     })
 
     it('Should require token ID to exist', async () => {
-      // Arrange
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.tokenId(), async (tokenId) => {
+          // Arrange
+          const { routines } = await loadFixture(systemFixture)
+          const consumer = await routines.deployPriviligedTerraformPermitTokenActor()
 
-      const privileged = await EthersHelpers.deployRandomSigner()
-      await terraformPermitToken.setConsumer(privileged.address)
+          // Act
+          const txPromise = consumer.consume(tokenId)
 
-      // Act
-      const txPromise = terraformPermitToken.connect(privileged).consume(1n)
-
-      // Assert
-      await expect(txPromise).to.be.revertedWith('ERC721: invalid token ID')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('ERC721: invalid token ID')
+        })
+      )
     })
 
     it('Should burn token on consumption', async () => {
-      // Arrange
-      const toAddress = await EthersHelpers.createWalletAddress()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      fc.assert(
+        fc.asyncProperty(Arbitrary.walletAddress(), async (permitTokenHolder) => {
+          // Arrange
+          const { routines } = await loadFixture(systemFixture)
+          const issuerAndConsumer = await routines.deployPriviligedTerraformPermitTokenActor()
+          await issuerAndConsumer.issue(permitTokenHolder)
 
-      const privileged = await EthersHelpers.deployRandomSigner()
-      await terraformPermitToken.setIssuer(privileged.address)
-      await terraformPermitToken.setConsumer(privileged.address)
-      await terraformPermitToken.connect(privileged).issue(toAddress)
+          // Act
+          await issuerAndConsumer.consume(1n)
 
-      // Act
-      await terraformPermitToken.connect(privileged).consume(1n)
-
-      // Assert
-      const balance = await terraformPermitToken.balanceOf(toAddress)
-      expect(balance).to.equal(0)
+          // Assert
+          const balance = await issuerAndConsumer.balanceOf(permitTokenHolder)
+          expect(balance).to.equal(0)
+        })
+      )
     })
 
     it('Should only be able to consume once per token', async () => {
-      // Arrange
-      const toAddress = await EthersHelpers.createWalletAddress()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.walletAddress(), async (permitTokenHolder) => {
+          // Arrange
+          const { routines } = await loadFixture(systemFixture)
+          const issuerAndConsumer = await routines.deployPriviligedTerraformPermitTokenActor()
+          await issuerAndConsumer.issue(permitTokenHolder)
+          await issuerAndConsumer.consume(1n)
 
-      const privileged = await EthersHelpers.deployRandomSigner()
-      await terraformPermitToken.setIssuer(privileged.address)
-      await terraformPermitToken.setConsumer(privileged.address)
-      await terraformPermitToken.connect(privileged).issue(toAddress)
-      await terraformPermitToken.connect(privileged).consume(1n)
+          // Act
+          const txPromise = issuerAndConsumer.consume(1n)
 
-      // Act
-      const txPromise = terraformPermitToken.connect(privileged).consume(1n)
-
-      // Assert
-      await expect(txPromise).to.be.revertedWith('ERC721: invalid token ID')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('ERC721: invalid token ID')
+        })
+      )
     })
   })
 })

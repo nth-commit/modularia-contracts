@@ -27,7 +27,7 @@ export namespace EthersHelpers {
   }
 
   export async function donateEth(address: string): Promise<void> {
-    await network.provider.send('hardhat_setBalance', [address, '0x10000000000000000'])
+    await network.provider.send('hardhat_setBalance', [address, '0x10000000000000000000'])
   }
 
   export namespace IERC721 {

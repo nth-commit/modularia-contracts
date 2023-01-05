@@ -1,183 +1,215 @@
 import { expect } from 'chai'
-import { deployTerraformPermitToken } from '../../helpers/DeployHelpers'
-import { EthersHelpers } from '../Helpers/EthersHelpers'
-import { time } from '@nomicfoundation/hardhat-network-helpers'
+import { loadFixture, time } from '@nomicfoundation/hardhat-network-helpers'
+import { SystemFixture } from './SystemFixture'
+import fc from 'fast-check'
+import { Arbitrary } from '../TestMachinery/Arbitrary'
 
 describe('TerraformPermitToken', () => {
+  const systemFixture = SystemFixture.create()
+
   describe('lock', () => {
     it('Should require caller to be owner', async () => {
-      // Arrange
-      const nonOwner = await EthersHelpers.deployRandomSigner()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.tokenId(), Arbitrary.bigNat(), async (tokenId, durationSeconds) => {
+          // Arrange
+          const { agents } = await loadFixture(systemFixture)
 
-      // Act
-      const txPromise = terraformPermitToken.connect(nonOwner).lock(0, 0)
+          // Act
+          const txPromise = agents.user.terraformPermitToken.lock(tokenId, durationSeconds)
 
-      // Assert
-      await expect(txPromise).to.be.revertedWith('Ownable: caller is not the owner')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('Ownable: caller is not the owner')
+        })
+      )
     })
 
     it('Should revert if token does not exist', async () => {
-      // Arrange
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.tokenId(), Arbitrary.bigNat(), async (tokenId, durationSeconds) => {
+          // Arrange
+          const { agents } = await loadFixture(systemFixture)
 
-      // Act
-      const txPromise = terraformPermitToken.lock(1, 0)
+          // Act
+          const txPromise = agents.owner.terraformPermitToken.lock(tokenId, durationSeconds)
 
-      // Assert
-      await expect(txPromise).to.be.revertedWith('Token does not exist')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('Token does not exist')
+        })
+      )
     })
 
     it('Should set lockedUntil', async () => {
-      // Arrange
-      const toAddress = await EthersHelpers.createWalletAddress()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(
+          Arbitrary.bigNat(),
+          Arbitrary.walletAddress(),
+          async (durationSeconds, permitHolderAddress) => {
+            // Arrange
+            const tokenId = 1n // One issuance
+            const { agents, routines } = await loadFixture(systemFixture)
+            const issuer = await routines.deployPriviligedTerraformPermitTokenActor()
+            await issuer.issue(permitHolderAddress)
 
-      const privileged = await EthersHelpers.deployRandomSigner()
-      await terraformPermitToken.setIssuer(privileged.address)
-      await terraformPermitToken.connect(privileged).issue(toAddress)
+            // Act
+            await agents.owner.terraformPermitToken.lock(tokenId, durationSeconds)
 
-      // Act
-      await terraformPermitToken.lock(1, 1)
-
-      // Assert
-      const lockedUntil = await terraformPermitToken.lockedUntilByTokenId(1)
-      expect(lockedUntil).to.equal((await time.latest()) + 1)
+            // Assert
+            const actualLockedUntil = await agents.owner.terraformPermitToken.lockedUntilByTokenId(tokenId)
+            const expectedLockedUntil = BigInt(await time.latest()) + durationSeconds
+            expect(actualLockedUntil).to.equal(expectedLockedUntil)
+          }
+        )
+      )
     })
   })
 
   describe('unlock', () => {
     it('Should require caller to be owner', async () => {
-      // Arrange
-      const nonOwner = await EthersHelpers.deployRandomSigner()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.tokenId(), async (tokenId) => {
+          // Arrange
+          const { agents } = await loadFixture(systemFixture)
 
-      // Act
-      const txPromise = terraformPermitToken.connect(nonOwner).unlock(1)
+          // Act
+          const txPromise = agents.user.terraformPermitToken.unlock(tokenId)
 
-      // Assert
-      await expect(txPromise).to.be.revertedWith('Ownable: caller is not the owner')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('Ownable: caller is not the owner')
+        })
+      )
     })
 
     it('Should revert if token does not exist', async () => {
-      // Arrange
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.tokenId(), async (tokenId) => {
+          // Arrange
+          const { agents } = await loadFixture(systemFixture)
 
-      // Act
-      const txPromise = terraformPermitToken.unlock(1)
+          // Act
+          const txPromise = agents.owner.terraformPermitToken.unlock(tokenId)
 
-      // Assert
-      await expect(txPromise).to.be.revertedWith('Token does not exist')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('Token does not exist')
+        })
+      )
     })
 
     it('Should clear lockedUntil', async () => {
-      // Arrange
-      const toAddress = await EthersHelpers.createWalletAddress()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(
+          Arbitrary.bigNat(),
+          Arbitrary.walletAddress(),
+          async (durationSeconds, permitHolderAddress) => {
+            // Arrange
+            const tokenId = 1n // One issuance
+            const { agents, routines } = await loadFixture(systemFixture)
+            const issuer = await routines.deployPriviligedTerraformPermitTokenActor()
+            await issuer.issue(permitHolderAddress)
+            await agents.owner.terraformPermitToken.lock(tokenId, durationSeconds)
 
-      const privileged = await EthersHelpers.deployRandomSigner()
-      await terraformPermitToken.setIssuer(privileged.address)
-      await terraformPermitToken.connect(privileged).issue(toAddress)
-      await terraformPermitToken.lock(1, 1)
+            // Act
+            await agents.owner.terraformPermitToken.unlock(tokenId)
 
-      // Act
-      await terraformPermitToken.unlock(1)
-
-      // Assert
-      const lockedUntil = await terraformPermitToken.lockedUntilByTokenId(1)
-      expect(lockedUntil).to.equal(0)
+            // Assert
+            const actualLockedUntil = await agents.owner.terraformPermitToken.lockedUntilByTokenId(tokenId)
+            expect(actualLockedUntil).to.equal(0n)
+          }
+        )
+      )
     })
   })
 
   describe('transfer', () => {
     it('Should revert if locked', async () => {
-      // Arrange
-      const owner = await EthersHelpers.getDefaultSigner()
-      const tokenOwner = await EthersHelpers.deployRandomSigner()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(
+          Arbitrary.bigNat(),
+          Arbitrary.walletAddress(),
+          async (durationSeconds, permitReceiverAddress) => {
+            // Arrange
+            const tokenId = 1n // One issuance
+            const { agents, routines } = await loadFixture(systemFixture)
+            const issuer = await routines.deployPriviligedTerraformPermitTokenActor()
+            await issuer.issue(agents.user.address)
+            await agents.owner.terraformPermitToken.lock(tokenId, durationSeconds)
 
-      const privileged = await EthersHelpers.deployRandomSigner()
-      await terraformPermitToken.setIssuer(privileged.address)
-      await terraformPermitToken.connect(privileged).issue(tokenOwner.address)
-      await terraformPermitToken.connect(owner).lock(1, 1)
+            // Act
+            const txPromise = agents.user.terraformPermitToken.transfer(permitReceiverAddress, tokenId)
 
-      // Act
-      const txPromise = terraformPermitToken
-        .connect(tokenOwner)
-        .transferFrom(tokenOwner.address, EthersHelpers.createWalletAddress(), 1)
-
-      // Assert
-      await expect(txPromise).to.be.revertedWith('Token is locked')
+            // Assert
+            await expect(txPromise).to.be.revertedWith('Token is locked')
+          }
+        )
+      )
     })
 
     it('Should transfer if lock expired', async () => {
-      // Arrange
-      const owner = await EthersHelpers.getDefaultSigner()
-      const tokenOwner = await EthersHelpers.deployRandomSigner()
-      const toAddress = EthersHelpers.createWalletAddress()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(
+          Arbitrary.bigNat(),
+          Arbitrary.walletAddress(),
+          async (durationSeconds, permitReceiverAddress) => {
+            // Arrange
+            const tokenId = 1n // One issuance
+            const { agents, routines } = await loadFixture(systemFixture)
+            const issuer = await routines.deployPriviligedTerraformPermitTokenActor()
+            await issuer.issue(agents.user.address)
+            await agents.owner.terraformPermitToken.lock(tokenId, durationSeconds)
 
-      const privileged = await EthersHelpers.deployRandomSigner()
-      await terraformPermitToken.setIssuer(privileged.address)
-      await terraformPermitToken.connect(privileged).issue(tokenOwner.address)
-      await terraformPermitToken.connect(owner).lock(1, 1)
-      await time.setNextBlockTimestamp((await time.latest()) + 2)
+            // Act
+            await time.setNextBlockTimestamp(BigInt(await time.latest()) + durationSeconds + 1n)
+            await agents.user.terraformPermitToken.transfer(permitReceiverAddress, tokenId)
 
-      // Act
-      await terraformPermitToken.connect(tokenOwner).transferFrom(tokenOwner.address, toAddress, 1)
-
-      // Assert
-      const balance = await terraformPermitToken.balanceOf(toAddress)
-      expect(balance).to.equal(1)
+            // Assert
+            const balance = await agents.owner.terraformPermitToken.balanceOf(permitReceiverAddress)
+            expect(balance).to.equal(1)
+          }
+        )
+      )
     })
 
     it('Can transfer if lock active but token owner is contract owner', async () => {
-      // Arrange
-      const owner = await EthersHelpers.getDefaultSigner()
-      const toAddress = EthersHelpers.createWalletAddress()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(
+          Arbitrary.bigNat(),
+          Arbitrary.walletAddress(),
+          async (durationSeconds, permitReceiverAddress) => {
+            // Arrange
+            const tokenId = 1n // One issuance
+            const { agents, routines } = await loadFixture(systemFixture)
+            const issuer = await routines.deployPriviligedTerraformPermitTokenActor()
+            await issuer.issue(agents.owner.address)
+            await agents.owner.terraformPermitToken.lock(tokenId, durationSeconds)
 
-      const privileged = await EthersHelpers.deployRandomSigner()
-      await terraformPermitToken.setIssuer(privileged.address)
-      await terraformPermitToken.connect(privileged).issue(owner.address)
-      await terraformPermitToken.connect(owner).lock(1, 1)
+            // Act
+            await agents.owner.terraformPermitToken.transfer(permitReceiverAddress, tokenId)
 
-      // Act
-      await terraformPermitToken.connect(owner).transferFrom(owner.address, toAddress, 1)
-
-      // Assert
-      const balance = await terraformPermitToken.balanceOf(toAddress)
-      expect(balance).to.equal(1)
+            // Assert
+            const balance = await agents.owner.terraformPermitToken.balanceOf(permitReceiverAddress)
+            expect(balance).to.equal(1)
+          }
+        )
+      )
     })
 
     it('Can consume if lock active', async () => {
-      // Arrange
-      const owner = await EthersHelpers.getDefaultSigner()
-      const toAddress = EthersHelpers.createWalletAddress()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.bigNat(), async (durationSeconds) => {
+          // Arrange
+          const tokenId = 1n // One issuance
+          const { agents, routines } = await loadFixture(systemFixture)
+          const issuerAndConsumer = await routines.deployPriviligedTerraformPermitTokenActor()
+          await issuerAndConsumer.issue(agents.owner.address)
+          await agents.owner.terraformPermitToken.lock(tokenId, durationSeconds)
 
-      const privileged = await EthersHelpers.deployRandomSigner()
-      await terraformPermitToken.setIssuer(privileged.address)
-      await terraformPermitToken.setConsumer(privileged.address)
-      await terraformPermitToken.connect(privileged).issue(owner.address)
-      await terraformPermitToken.connect(owner).lock(1, 1)
+          // Act
+          await issuerAndConsumer.consume(tokenId)
 
-      // Act
-      await terraformPermitToken.connect(privileged).consume(1)
-
-      // Assert
-      const balance = await terraformPermitToken.balanceOf(toAddress)
-      expect(balance).to.equal(0)
+          // Assert
+          const balance = await agents.owner.terraformPermitToken.balanceOf(agents.owner.address)
+          expect(balance).to.equal(0n)
+        })
+      )
     })
   })
 })

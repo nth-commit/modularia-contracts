@@ -1,45 +1,51 @@
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 import { expect } from 'chai'
+import fc from 'fast-check'
 import { ethers } from 'hardhat'
-import { deployTerraformPermitToken } from '../../helpers/DeployHelpers'
-import { EthersHelpers } from '../Helpers/EthersHelpers'
+import { Arbitrary } from '../TestMachinery/Arbitrary'
+import { SystemFixture } from './SystemFixture'
 
 describe('TerraformPermitToken', () => {
+  const systemFixture = SystemFixture.create()
+
   describe('setIssuer', () => {
     it('Should require caller to be owner', async () => {
-      // Arrange
-      const nonOwner = await EthersHelpers.deployRandomSigner()
-      const issuer = await EthersHelpers.deployRandomSigner()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.walletAddress(), async (walletAddress) => {
+          // Arrange
+          const { agents } = await loadFixture(systemFixture)
 
-      // Act
-      const txPromise = terraformPermitToken.connect(nonOwner).setIssuer(issuer.address)
+          // Act
+          const txPromise = agents.user.terraformPermitToken.setIssuer(walletAddress)
 
-      // Assert
-      await expect(txPromise).to.be.revertedWith('Ownable: caller is not the owner')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('Ownable: caller is not the owner')
+        })
+      )
     })
 
     it('Should only be able to set issuer once', async () => {
-      // Arrange
-      const issuer = await EthersHelpers.deployRandomSigner()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.walletAddress(), async (walletAddress) => {
+          // Arrange
+          const { agents } = await loadFixture(systemFixture)
+          await agents.owner.terraformPermitToken.setIssuer(walletAddress)
 
-      // Act
-      await terraformPermitToken.setIssuer(issuer.address)
-      const txPromise = terraformPermitToken.setIssuer(issuer.address)
+          // Act
+          const txPromise = agents.owner.terraformPermitToken.setIssuer(walletAddress)
 
-      // Assert
-      await expect(txPromise).to.be.revertedWith('Issuer already set')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('Issuer already set')
+        })
+      )
     })
 
     it('Should not be able to set issuer to the zero address', async () => {
       // Arrange
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      const { agents } = await loadFixture(systemFixture)
 
       // Act
-      const txPromise = terraformPermitToken.setIssuer(ethers.constants.AddressZero)
+      const txPromise = agents.owner.terraformPermitToken.setIssuer(ethers.constants.AddressZero)
 
       // Assert
       await expect(txPromise).to.be.revertedWith('Cannot set issuer to zero address')
@@ -48,33 +54,35 @@ describe('TerraformPermitToken', () => {
 
   describe('issue', () => {
     it('Should revert if called by non-issuer', async () => {
-      // Arrange
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
-      const toAddress = await EthersHelpers.createWalletAddress()
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.walletAddress(), async (toAddress) => {
+          // Arrange
+          const { agents } = await loadFixture(systemFixture)
 
-      // Act
-      const txPromise = terraformPermitToken.issue(toAddress)
+          // Act
+          const txPromise = agents.user.terraformPermitToken.issue(toAddress)
 
-      // Assert
-      await expect(txPromise).to.be.revertedWith('Caller does not have issuer rights')
+          // Assert
+          await expect(txPromise).to.be.revertedWith('Caller does not have issuer rights')
+        })
+      )
     })
 
     it('Should mint token on issuance', async () => {
-      // Arrange
-      const toAddress = await EthersHelpers.createWalletAddress()
-      const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
-      const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.walletAddress(), async (toAddress) => {
+          // Arrange
+          const { agents, routines } = await loadFixture(systemFixture)
+          const issuer = await routines.deployPriviligedTerraformPermitTokenActor()
 
-      const privileged = await EthersHelpers.deployRandomSigner()
-      await terraformPermitToken.setIssuer(privileged.address)
+          // Act
+          await issuer.issue(toAddress)
 
-      // Act
-      await terraformPermitToken.connect(privileged).issue(toAddress)
-
-      // Assert
-      const balance = await terraformPermitToken.balanceOf(toAddress)
-      expect(balance).to.equal(1)
+          // Assert
+          const balance = await agents.user.terraformPermitToken.balanceOf(toAddress)
+          expect(balance).to.equal(1)
+        })
+      )
     })
   })
 })
