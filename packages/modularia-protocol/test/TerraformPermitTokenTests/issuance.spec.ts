@@ -62,14 +62,15 @@ describe('TerraformPermitToken', () => {
 
     it('Should mint token on issuance', async () => {
       // Arrange
-      const issuer = await EthersHelpers.deployRandomSigner()
       const toAddress = await EthersHelpers.createWalletAddress()
       const airdropTo = await EthersHelpers.IERC721.deployStubERC721()
       const terraformPermitToken = await deployTerraformPermitToken(airdropTo, 1n)
-      await terraformPermitToken.setIssuer(issuer.address)
+
+      const privileged = await EthersHelpers.deployRandomSigner()
+      await terraformPermitToken.setIssuer(privileged.address)
 
       // Act
-      await terraformPermitToken.connect(issuer).issue(toAddress)
+      await terraformPermitToken.connect(privileged).issue(toAddress)
 
       // Assert
       const balance = await terraformPermitToken.balanceOf(toAddress)
