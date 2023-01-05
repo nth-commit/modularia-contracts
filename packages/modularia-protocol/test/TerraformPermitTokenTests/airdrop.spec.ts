@@ -3,7 +3,7 @@ import { deployTerraformPermitToken } from '../../helpers/DeployHelpers'
 import { EthersHelpers } from '../Helpers/EthersHelpers'
 
 describe('TerraformPermitToken', () => {
-  describe('Airdrop', () => {
+  describe('airdrop', () => {
     it('Should require max airdrop supply to to not be exceeded', async () => {
       // Arrange
       const airdropTo = await EthersHelpers.IERC721.deployStubERC721()

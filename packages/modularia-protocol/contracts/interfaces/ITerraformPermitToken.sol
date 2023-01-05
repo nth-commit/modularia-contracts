@@ -6,7 +6,7 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 interface ITerraformPermitToken is IERC721 {
     function totalSupply() external view returns (uint256);
 
-    function mint(address to) external;
+    function issue(address to) external;
 
     function airdrop(uint256 airdropToTokenId) external;
 }

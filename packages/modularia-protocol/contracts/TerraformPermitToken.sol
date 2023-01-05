@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: GNU GPLv3
 pragma solidity ^0.8.9;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 import {ITerraformPermitToken} from "./interfaces/ITerraformPermitToken.sol";
 
-contract TerraformPermitToken is ITerraformPermitToken, ERC721 {
+contract TerraformPermitToken is ITerraformPermitToken, ERC721, Ownable {
     uint256 private _totalSupply;
+    address private _issuer;
+    mapping(uint32 => bool) private _usedKeys;
 
     IERC721 private immutable airdropTo;
     uint256 private immutable airdropMaxSupply;
@@ -19,13 +22,32 @@ contract TerraformPermitToken is ITerraformPermitToken, ERC721 {
         airdropMaxSupply = _airdropMaxSupply;
     }
 
+    modifier onlyIssuer() {
+        require(_issuer == msg.sender, "Caller does not have issuer rights");
+        _;
+    }
+
+    modifier oncePerContract(uint32 key, string memory errorMessage) {
+        require(_usedKeys[key] == false, errorMessage);
+        _usedKeys[key] = true;
+        _;
+    }
+
+    /**
+     * Sets the issuer of the permit tokens. This can only be called once. Should be called with the address of the
+     * contract that manages permit token auctions.
+     */
+    function setIssuer(address issuer) external onlyOwner oncePerContract(0, "Issuer already set") {
+        require(issuer != address(0), "Cannot set issuer to zero address");
+        _issuer = issuer;
+    }
+
     function totalSupply() external view override returns (uint256) {
         return _totalSupply;
     }
 
-    function mint(address to) public override {
-        _totalSupply++;
-        _mint(to, _totalSupply);
+    function issue(address to) external onlyIssuer {
+        _mint(to);
     }
 
     /**
@@ -42,7 +64,7 @@ contract TerraformPermitToken is ITerraformPermitToken, ERC721 {
         address owner = _lookupAirdropOwner(airdropToTokenId);
         require(owner != address(0), "Error looking up owner of token ID, the token may not exist");
 
-        mint(owner);
+        _mint(owner);
     }
 
     function _lookupAirdropOwner(uint256 airdropToTokenId) internal view returns (address) {
@@ -51,5 +73,10 @@ contract TerraformPermitToken is ITerraformPermitToken, ERC721 {
         } catch {
             return address(0);
         }
+    }
+
+    function _mint(address to) internal {
+        _totalSupply++;
+        _mint(to, _totalSupply);
     }
 }

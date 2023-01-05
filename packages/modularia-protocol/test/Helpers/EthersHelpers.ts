@@ -3,11 +3,12 @@ import { ethers, network } from 'hardhat'
 import { range } from 'ix/iterable'
 import { IERC721, StubERC721 } from '../../typechain-types'
 
-export async function getSigner(): Promise<SignerWithAddress> {
-  return (await ethers.getSigners())[0]!
-}
-
 export namespace EthersHelpers {
+  export async function getDefaultSigner(): Promise<SignerWithAddress> {
+    const [defaultSigner] = await ethers.getSigners()
+    return defaultSigner!
+  }
+
   export function createWalletAddress(): string {
     return ethers.Wallet.createRandom().address
   }
