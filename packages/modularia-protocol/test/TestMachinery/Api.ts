@@ -60,21 +60,23 @@ export type LandMetadata = {
 }
 
 export type LandTokenApi = {
-  terraform(x: bigint, y: bigint): Promise<ContractTransaction>
+  terraform(xy: [bigint, bigint]): Promise<ContractTransaction>
   myBalance(): Promise<bigint>
   balanceOf(address: string): Promise<bigint>
-  landMetadata(x: bigint, y: bigint): Promise<LandMetadata>
+  tokenIdByCoordinate(xy: [bigint, bigint]): Promise<bigint>
+  landMetadataByTokenId(tokenId: bigint): Promise<LandMetadata>
 }
 
 export namespace LandTokenApi {
   export function create(landToken: LandTokenContract, actor: SignerWithAddress): LandTokenApi {
     landToken = landToken.connect(actor)
     return {
-      terraform: async (x, y) => landToken.terraform(x, y),
+      terraform: async (xy) => landToken.terraform(...xy),
       myBalance: async () => (await landToken.balanceOf(actor.address)).toBigInt(),
       balanceOf: async (address) => (await landToken.balanceOf(address)).toBigInt(),
-      landMetadata: async (x, y) => {
-        const landType = await landToken.landMetadata(x, y)
+      tokenIdByCoordinate: async (xy) => (await landToken.tokenIdByCoordinate(...xy)).toBigInt(),
+      landMetadataByTokenId: async (tokenId) => {
+        const landType = await landToken.landMetadataByTokenId(tokenId)
         return {
           landType: toLandType(landType),
         }

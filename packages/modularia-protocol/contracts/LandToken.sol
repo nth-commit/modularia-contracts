@@ -14,7 +14,8 @@ struct LandTokenMetadata {
 contract LandToken is ILandToken, ERC721 {
     uint256 private _totalSupply;
 
-    mapping(int256 => mapping(int256 => LandTokenMetadata)) public landMetadata;
+    mapping(int256 => mapping(int256 => uint256)) public tokenIdByCoordinate;
+    mapping(uint256 => LandTokenMetadata) public landMetadataByTokenId;
 
     ITerraformPermitToken private immutable terraformPermitToken;
 
@@ -24,11 +25,20 @@ contract LandToken is ILandToken, ERC721 {
 
     function terraform(int256 x, int256 y) external {
         require(terraformPermitToken.balanceOf(msg.sender) > 0, "Caller does not own permit token");
-        require(landMetadata[x][y].landType == 0, "Land already terraformed");
+        require(tokenIdByCoordinate[x][y] == 0, "Land already terraformed");
+        require(
+            (x == 0 && y == 0) ||
+                tokenIdByCoordinate[x - 1][y] != 0 ||
+                tokenIdByCoordinate[x + 1][y] != 0 ||
+                tokenIdByCoordinate[x][y - 1] != 0 ||
+                tokenIdByCoordinate[x][y + 1] != 0,
+            "Land must be adjacent to existing"
+        );
 
         terraformPermitToken.consumeFrom(msg.sender);
         _mint(msg.sender);
-        landMetadata[x][y] = LandTokenMetadata(1);
+        tokenIdByCoordinate[x][y] = _totalSupply;
+        landMetadataByTokenId[_totalSupply] = LandTokenMetadata(1);
     }
 
     function _mint(address to) internal {

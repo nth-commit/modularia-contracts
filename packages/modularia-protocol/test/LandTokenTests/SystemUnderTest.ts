@@ -1,5 +1,4 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { Contract } from 'ethers'
 import { deployLandToken, deployTerraformPermitToken } from '../../helpers/DeployHelpers'
 import { LandToken, StubERC721, TerraformPermitToken } from '../../typechain-types'
 import { EthersHelpers } from '../Helpers/EthersHelpers'
@@ -16,6 +15,7 @@ export type SystemUnderTest = GenericSystemUnderTest<
   SystemUnderTestApi,
   {
     issuePermitToUser(count?: bigint): Promise<void>
+    terraformOriginLand(): Promise<void>
   }
 >
 
@@ -34,6 +34,11 @@ export namespace SystemUnderTest {
       await terraformPermitToken.setConsumer(landToken.address)
 
       const user = createActor(terraformPermitToken, landToken, await EthersHelpers.deployRandomSigner())
+      const userEarmarkedForOrigin = createActor(
+        terraformPermitToken,
+        landToken,
+        await EthersHelpers.deployRandomSigner()
+      )
       const terraformPermitTokenIssuer = await createTerraformPermitTokenIssuer(
         terraformPermitToken,
         landToken,
@@ -55,6 +60,10 @@ export namespace SystemUnderTest {
             for (let i = 0; i < Number(count); i++) {
               await terraformPermitTokenIssuer.terraformPermitToken.issue(user.address)
             }
+          },
+          terraformOriginLand: async () => {
+            await terraformPermitTokenIssuer.terraformPermitToken.issue(userEarmarkedForOrigin.address)
+            await userEarmarkedForOrigin.landToken.terraform([0n, 0n])
           },
         },
       }

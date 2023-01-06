@@ -1,5 +1,4 @@
 import fc from 'fast-check'
-import { range } from 'ix/iterable'
 
 export namespace Arbitrary {
   export function two<T>(arb: fc.Arbitrary<T>): fc.Arbitrary<[T, T]> {
@@ -48,5 +47,21 @@ export namespace Arbitrary {
       .hexaString({ minLength: 40, maxLength: 40 })
       .map((hex) => `0x${hex}`)
       .filter((x) => x !== '0x0000000000000000000000000000000000000000')
+  }
+
+  export namespace XY {
+    export function any(): fc.Arbitrary<[bigint, bigint]> {
+      return two(bigInt())
+    }
+
+    export function originAdjacent(): fc.Arbitrary<[bigint, bigint]> {
+      return fc.constantFrom<[bigint, bigint]>([-1n, 0n], [0n, -1n], [0n, 1n], [1n, 0n])
+    }
+
+    export function nonOriginAdjacent(): fc.Arbitrary<[bigint, bigint]> {
+      // If both x and y are non-zero, then the co-ordinate is not adjacent (0,0) (excluding diagonals)
+      const arbNonZeroBigInt = bigInt().filter((x) => x !== 0n)
+      return two(arbNonZeroBigInt)
+    }
   }
 }
