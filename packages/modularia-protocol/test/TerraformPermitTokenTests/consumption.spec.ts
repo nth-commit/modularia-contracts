@@ -52,15 +52,15 @@ describe('TerraformPermitToken', () => {
     })
   })
 
-  describe('consume', () => {
+  describe('consumeFrom', () => {
     it('Should revert if called by non-consumer', async () => {
       await fc.assert(
-        fc.asyncProperty(Arbitrary.tokenId(), async (tokenId) => {
+        fc.asyncProperty(Arbitrary.walletAddress(), async (permitTokenHolder) => {
           // Arrange
           const { agents } = await loadFixture(systemFixture)
 
           // Act
-          const txPromise = agents.user.terraformPermitToken.consume(tokenId)
+          const txPromise = agents.user.terraformPermitToken.consumeFrom(permitTokenHolder)
 
           // Assert
           await expect(txPromise).to.be.revertedWith('Caller does not have consumer rights')
@@ -68,18 +68,36 @@ describe('TerraformPermitToken', () => {
       )
     })
 
-    it('Should require token ID to exist', async () => {
+    it('Should require owner to have at least one token', async () => {
       await fc.assert(
-        fc.asyncProperty(Arbitrary.tokenId(), async (tokenId) => {
+        fc.asyncProperty(Arbitrary.walletAddress(), async (permitTokenHolder) => {
           // Arrange
           const { routines } = await loadFixture(systemFixture)
           const consumer = await routines.deployPriviligedTerraformPermitTokenActor()
 
           // Act
-          const txPromise = consumer.consume(tokenId)
+          const txPromise = consumer.consumeFrom(permitTokenHolder)
 
           // Assert
-          await expect(txPromise).to.be.revertedWith('ERC721: invalid token ID')
+          await expect(txPromise).to.be.revertedWith('Owner does not own token')
+        })
+      )
+    })
+
+    it('Should only be able to consume once per token', async () => {
+      await fc.assert(
+        fc.asyncProperty(Arbitrary.walletAddress(), async (permitTokenHolder) => {
+          // Arrange
+          const { routines } = await loadFixture(systemFixture)
+          const issuerAndConsumer = await routines.deployPriviligedTerraformPermitTokenActor()
+          await issuerAndConsumer.issue(permitTokenHolder)
+          await issuerAndConsumer.consumeFrom(permitTokenHolder)
+
+          // Act
+          const txPromise = issuerAndConsumer.consumeFrom(permitTokenHolder)
+
+          // Assert
+          await expect(txPromise).to.be.revertedWith('Owner does not own token')
         })
       )
     })
@@ -93,29 +111,11 @@ describe('TerraformPermitToken', () => {
           await issuerAndConsumer.issue(permitTokenHolder)
 
           // Act
-          await issuerAndConsumer.consume(1n)
+          await issuerAndConsumer.consumeFrom(permitTokenHolder)
 
           // Assert
           const balance = await issuerAndConsumer.balanceOf(permitTokenHolder)
           expect(balance).to.equal(0)
-        })
-      )
-    })
-
-    it('Should only be able to consume once per token', async () => {
-      await fc.assert(
-        fc.asyncProperty(Arbitrary.walletAddress(), async (permitTokenHolder) => {
-          // Arrange
-          const { routines } = await loadFixture(systemFixture)
-          const issuerAndConsumer = await routines.deployPriviligedTerraformPermitTokenActor()
-          await issuerAndConsumer.issue(permitTokenHolder)
-          await issuerAndConsumer.consume(1n)
-
-          // Act
-          const txPromise = issuerAndConsumer.consume(1n)
-
-          // Assert
-          await expect(txPromise).to.be.revertedWith('ERC721: invalid token ID')
         })
       )
     })

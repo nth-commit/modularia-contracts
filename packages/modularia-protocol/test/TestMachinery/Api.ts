@@ -1,13 +1,17 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { ContractTransaction } from 'ethers'
-import { TerraformPermitToken as TerraformPermitTokenContract } from '../../typechain-types'
+import {
+  LandToken as LandTokenContract,
+  StubERC721 as StubERC721Contract,
+  TerraformPermitToken as TerraformPermitTokenContract,
+} from '../../typechain-types'
 
 export type TerraformPermitTokenApi = {
   transfer(to: string, tokenId: bigint): unknown
   setIssuer(issuer: string): unknown
   setConsumer(consumer: string): Promise<ContractTransaction>
   issue(to: string): Promise<ContractTransaction>
-  consume(tokenId: bigint): Promise<ContractTransaction>
+  consumeFrom(owner: string): Promise<ContractTransaction>
   airdrop(tokenId: bigint): Promise<ContractTransaction>
   myBalance(): Promise<bigint>
   balanceOf(address: string): Promise<bigint>
@@ -27,13 +31,63 @@ export namespace TerraformPermitTokenApi {
       setIssuer: async (issuer) => terraformPermitToken.setIssuer(issuer),
       setConsumer: async (consumer) => terraformPermitToken.setConsumer(consumer),
       issue: async (to) => terraformPermitToken.issue(to),
-      consume: async (tokenId) => terraformPermitToken.consume(tokenId),
+      consumeFrom: async (owner) => terraformPermitToken.consumeFrom(owner),
       airdrop: async (tokenId) => terraformPermitToken.airdrop(tokenId),
       myBalance: async () => (await terraformPermitToken.balanceOf(actor.address)).toBigInt(),
       balanceOf: async (address) => (await terraformPermitToken.balanceOf(address)).toBigInt(),
       lock: async (tokenId, durationSeconds) => terraformPermitToken.lock(tokenId, durationSeconds),
       unlock: async (tokenId) => terraformPermitToken.unlock(tokenId),
       lockedUntilByTokenId: async (tokenId) => (await terraformPermitToken.lockedUntilByTokenId(tokenId)).toBigInt(),
+    }
+  }
+}
+
+export type StubERC721Api = {
+  mint(to: string, tokenId: bigint): Promise<ContractTransaction>
+}
+
+export namespace StubERC721Api {
+  export function create(erc721: StubERC721Contract, actor: SignerWithAddress): StubERC721Api {
+    erc721 = erc721.connect(actor)
+    return {
+      mint: async (to, tokenId) => erc721.mint(to, tokenId),
+    }
+  }
+}
+
+export type LandMetadata = {
+  landType: 'parcel'
+}
+
+export type LandTokenApi = {
+  terraform(x: bigint, y: bigint): Promise<ContractTransaction>
+  myBalance(): Promise<bigint>
+  balanceOf(address: string): Promise<bigint>
+  landMetadata(x: bigint, y: bigint): Promise<LandMetadata>
+}
+
+export namespace LandTokenApi {
+  export function create(landToken: LandTokenContract, actor: SignerWithAddress): LandTokenApi {
+    landToken = landToken.connect(actor)
+    return {
+      terraform: async (x, y) => landToken.terraform(x, y),
+      myBalance: async () => (await landToken.balanceOf(actor.address)).toBigInt(),
+      balanceOf: async (address) => (await landToken.balanceOf(address)).toBigInt(),
+      landMetadata: async (x, y) => {
+        const landType = await landToken.landMetadata(x, y)
+        return {
+          landType: toLandType(landType),
+        }
+      },
+    }
+  }
+
+  function toLandType(landType: number): LandMetadata['landType'] {
+    switch (landType) {
+      case 1:
+        return 'parcel'
+      default:
+        throw new Error(`Unknown land type: ${landType}`)
     }
   }
 }

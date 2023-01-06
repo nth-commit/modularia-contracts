@@ -11,7 +11,7 @@ export namespace Arbitrary {
     max?: bigint
   }
 
-  export function bigInt(constraints: BigIntConstraints): fc.Arbitrary<bigint> {
+  export function bigInt(constraints: BigIntConstraints = {}): fc.Arbitrary<bigint> {
     const safeConstraints: fc.IntegerConstraints = {}
 
     if (constraints.min !== undefined) {
@@ -44,6 +44,9 @@ export namespace Arbitrary {
   }
 
   export function walletAddress(): fc.Arbitrary<string> {
-    return fc.hexaString({ minLength: 40, maxLength: 40 }).map((hex) => `0x${hex}`)
+    return fc
+      .hexaString({ minLength: 40, maxLength: 40 })
+      .map((hex) => `0x${hex}`)
+      .filter((x) => x !== '0x0000000000000000000000000000000000000000')
   }
 }

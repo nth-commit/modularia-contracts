@@ -15,7 +15,7 @@ const config: HardhatUserConfig = {
     },
     test: {
       tasks: ['test'],
-      files: ['./contracts', './test'],
+      files: ['./contracts', './test', './helpers'],
       clearOnStart: true,
     },
   },

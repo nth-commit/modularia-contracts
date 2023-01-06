@@ -15,8 +15,8 @@ describe('TerraformPermitToken', () => {
         fc.asyncProperty(Arbitrary.two(Arbitrary.tokenId()), async ([tokenId0, tokenId1]) => {
           // Arrange
           const { agents } = await loadFixture(systemFixture)
-          await agents.owner.airdropToken.mint(agents.user, tokenId0)
-          await agents.owner.airdropToken.mint(agents.user, tokenId1)
+          await agents.owner.airdropToken.mint(agents.user.address, tokenId0)
+          await agents.owner.airdropToken.mint(agents.user.address, tokenId1)
           await agents.owner.terraformPermitToken.airdrop(tokenId0)
 
           // Act
@@ -33,7 +33,7 @@ describe('TerraformPermitToken', () => {
         fc.asyncProperty(Arbitrary.tokenId(), async (tokenId) => {
           // Arrange
           const { agents } = await loadFixture(systemFixture)
-          await agents.owner.airdropToken.mint(agents.user, tokenId)
+          await agents.owner.airdropToken.mint(agents.user.address, tokenId)
           await agents.owner.terraformPermitToken.airdrop(tokenId)
 
           // Act
@@ -65,7 +65,7 @@ describe('TerraformPermitToken', () => {
         fc.asyncProperty(Arbitrary.tokenId(), async (tokenId) => {
           // Arrange
           const { agents } = await loadFixture(systemFixture)
-          await agents.owner.airdropToken.mint(agents.user, tokenId)
+          await agents.owner.airdropToken.mint(agents.user.address, tokenId)
 
           // Act
           await agents.owner.terraformPermitToken.airdrop(tokenId)

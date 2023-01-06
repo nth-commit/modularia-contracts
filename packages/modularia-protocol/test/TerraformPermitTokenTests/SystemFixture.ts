@@ -1,10 +1,9 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { ContractTransaction } from 'ethers'
 import { deployTerraformPermitToken } from '../../helpers/DeployHelpers'
 import { TerraformPermitToken as TerraformPermitTokenContract } from '../../typechain-types'
 import { EthersHelpers } from '../Helpers/EthersHelpers'
 import { RawSystemFixture } from '../Helpers/RawSystemFixture'
-import { TerraformPermitTokenApi } from '../TestMachinery/Api'
+import { StubERC721Api, TerraformPermitTokenApi } from '../TestMachinery/Api'
 
 export type SystemOptions = {
   airdropMaxSupply: bigint
@@ -28,19 +27,11 @@ export type Agent = {
 
 export namespace SystemFixture {
   export function create(options: Partial<SystemOptions> = {}): () => Promise<System> {
-    const rawSystemFixture = createRawSystemFixture({ airdropMaxSupply: 10_000n, ...options })
-
     return async function fixture() {
-      const rawSystem = await rawSystemFixture()
+      const rawSystem = await createRawSystemFixture({ airdropMaxSupply: 10_000n, ...options })()
 
-      const owner = createApi(rawSystem.owner, rawSystem, lookupAddress)
-      const user = createApi(rawSystem.signers.user, rawSystem, lookupAddress)
-
-      function lookupAddress(agent: Agent) {
-        if (agent === owner) return rawSystem.owner.address
-        if (agent === user) return rawSystem.signers.user.address
-        throw new Error(`Unknown agent: ${agent}`)
-      }
+      const owner = createApi(rawSystem.owner, rawSystem)
+      const user = createApi(rawSystem.signers.user, rawSystem)
 
       const system: System = {
         contracts: {
@@ -77,23 +68,16 @@ export namespace SystemFixture {
 
   function createApi(
     signer: SignerWithAddress,
-    system: Awaited<ReturnType<ReturnType<typeof createRawSystemFixture>>>,
-    lookupAddress: (agent: Agent) => string
+    system: Awaited<ReturnType<ReturnType<typeof createRawSystemFixture>>>
   ): Agent {
     const { airdropTo, terraformPermitToken } = system.contracts(signer)
 
     const agent: Agent = {
       address: signer.address,
-      airdropToken: {
-        mint: async (to, tokenId) => airdropTo.mint(lookupAddress(to), tokenId),
-      },
+      airdropToken: StubERC721Api.create(airdropTo, signer),
       terraformPermitToken: TerraformPermitTokenApi.create(terraformPermitToken, signer),
     }
 
     return agent
   }
-}
-
-export type StubERC721Api = {
-  mint(to: Agent, tokenId: bigint): Promise<ContractTransaction>
 }

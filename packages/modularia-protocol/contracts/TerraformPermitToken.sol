@@ -4,10 +4,11 @@ pragma solidity ^0.8.9;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 
 import {ITerraformPermitToken} from "./interfaces/ITerraformPermitToken.sol";
 
-contract TerraformPermitToken is ITerraformPermitToken, ERC721, Ownable {
+contract TerraformPermitToken is ITerraformPermitToken, ERC721Enumerable, Ownable {
     uint256 private _totalSupply;
     address private _issuer;
     address private _consumer;
@@ -41,10 +42,6 @@ contract TerraformPermitToken is ITerraformPermitToken, ERC721, Ownable {
         _;
     }
 
-    function totalSupply() external view override returns (uint256) {
-        return _totalSupply;
-    }
-
     /**
      * Sets the issuer of the permit tokens. This can only be called once. Should be called with the address of the
      * contract that manages permit token auctions. Allows the target issuer to mint permit tokens.
@@ -71,9 +68,11 @@ contract TerraformPermitToken is ITerraformPermitToken, ERC721, Ownable {
     }
 
     /**
-     * Burns a permit token. Can only be called by the consumer.
+     * Burns a permit token associated with the given owner. Can only be called by the consumer.
      */
-    function consume(uint256 tokenId) external onlyConsumer {
+    function consumeFrom(address owner) external onlyConsumer {
+        require(balanceOf(owner) > 0, "Owner does not own token");
+        uint256 tokenId = tokenOfOwnerByIndex(owner, 0);
         _burn(tokenId);
     }
 
@@ -119,8 +118,7 @@ contract TerraformPermitToken is ITerraformPermitToken, ERC721, Ownable {
     }
 
     function _mint(address to) internal {
-        _totalSupply++;
-        _mint(to, _totalSupply);
+        _mint(to, totalSupply() + 1);
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 firstTokenId, uint256 batchSize) internal override {

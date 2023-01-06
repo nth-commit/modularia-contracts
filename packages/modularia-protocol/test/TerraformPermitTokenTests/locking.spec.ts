@@ -203,7 +203,7 @@ describe('TerraformPermitToken', () => {
           await agents.owner.terraformPermitToken.lock(tokenId, durationSeconds)
 
           // Act
-          await issuerAndConsumer.consume(tokenId)
+          await issuerAndConsumer.consumeFrom(agents.owner.address)
 
           // Assert
           const balance = await agents.owner.terraformPermitToken.balanceOf(agents.owner.address)
