@@ -29,8 +29,8 @@ In a future generation algorithm, the z co-ordinate could also be generated and 
 
 ## Stories
 
-- Minting parcels (no commons or reserves) of any (x,y) co-ordinates, by burning permits
-- Validate (x,y) co-ordinates are in bounds
+- Minting parcels (no commons or reserves) of any (x,y) co-ordinates, by burning permits ✅
+- Validate (x,y) co-ordinates are in bounds ✅
 - Write a simple rendering script, so we can observe the algoithm's behaviour
 - Basic guild/terrain implementation
 - Spike: generating z-index on-chain (using something like [Diamond-Square](https://en.wikipedia.org/wiki/Diamond-square_algorithm)), or off-chain with ZK-SNARKS

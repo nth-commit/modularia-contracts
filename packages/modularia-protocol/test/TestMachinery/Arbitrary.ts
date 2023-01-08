@@ -1,4 +1,5 @@
 import fc from 'fast-check'
+import { GeographyHelpers } from './GeographyHelpers'
 
 export namespace Arbitrary {
   export function two<T>(arb: fc.Arbitrary<T>): fc.Arbitrary<[T, T]> {
@@ -55,7 +56,7 @@ export namespace Arbitrary {
     }
 
     export function originAdjacent(): fc.Arbitrary<[bigint, bigint]> {
-      return fc.constantFrom<[bigint, bigint]>([-1n, 0n], [0n, -1n], [0n, 1n], [1n, 0n])
+      return fc.constantFrom<[bigint, bigint]>(...GeographyHelpers.neighborsOf([0n, 0n]))
     }
 
     export function nonOriginAdjacent(): fc.Arbitrary<[bigint, bigint]> {
